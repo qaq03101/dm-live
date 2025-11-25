@@ -1,0 +1,52 @@
+[server]
+bind_ip = "0.0.0.0"
+port = 9090
+max_connections = 50000
+
+[runtime]
+fallback_worker_count = 4
+
+[dispatcher]
+shard_count = 16
+frame_batch_size = 32
+
+[media.ring_buffer]
+max_gop_count = 3
+max_frames_per_gop = 30
+force_flush_non_key_frames = 8
+force_flush_audio_frames = 8
+
+[media.packet_cache]
+max_packets_per_frame = 100
+
+[rtp.sorter]
+max_buffer_size = 1024
+max_buffer_ms = 1000
+max_distance = 256
+
+[rtp.udp]
+linux_max_batch = 1024
+
+[io]
+mock_socket_io = false
+
+[session.rtsp]
+session_timeout_secs = 60
+max_pending_udp = 2048
+udp_queue_capacity = 256
+udp_recv_buffer = 2048
+server_header = "RustRtspServer/1.0"
+
+[session.rtsp.default_media]
+schema = "rtsp"
+host = "localhost"
+port = 9090
+app = "live"
+stream = "test"
+protocol = "rtsp"
+
+[session.pull]
+max_pending_packets = 1024
+send_queue_capacity = 512
+tcp_batch_size = 64
+merge_window_ms = 2
