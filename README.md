@@ -26,7 +26,7 @@
 | **单核效能** | **~5.6 Gbps/Core** | 极高的能效比 |
 | **单连接内存** | **~19 KB** | 包含 TCP 栈与业务状态 |
 
-> **详细测试报告与图表请查阅 [BENCHMARK.md](bench/PERFORMANCE.md)**
+> **详细测试报告与图表请查阅 [BENCHMARK.md](docs/pull_bench.md)**
 
 ## 架构概览
 
