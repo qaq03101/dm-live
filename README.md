@@ -1,43 +1,41 @@
-# dm-live
+﻿# dm-live
 
-**dm-live** 是一个基于 Rust 构建的高性能、低延迟 RTSP 流媒体服务器。
+**dm-live** is a high-performance, low-latency RTSP streaming server built in Rust.
 
-它通过 **Tokio** 的 `current_thread` 运行时采用了**Thread-per-Core** 架构的多 **Reactor** 模型
+It uses Tokio's `current_thread` runtime with a Thread-per-Core, multi-reactor architecture.
 
-## 核心特性
+## Core Features
 
-*   **Thread-per-Core 架构**：
-    不使用Tokio的工作窃取模式。`RuntimePool` 根据 CPU 核数创建独立的运行时，连接与线程绑定,实现多 Reactor 模型。使用这种无锁设计消除了互斥锁竞争并最大化了 CPU 缓存局部性。
-*   **零拷贝 (Zero-Copy) 数据路径**：
-    通过 `Arc` 指针对数据进行封装，消除转发路径上的拷贝点， 实现 Zero-Copy。
-*   **批量 I/O 优化**：
-    - **UDP**: 在 Linux 下使用 `sendmmsg` 实现系统调用级批量发送。
-    - **TCP**: 实现了用户态写队列合并（Vectored I/O）和 Writev ，大幅减少 Syscall 次数。
+- **Thread-per-Core architecture**
+  - Does not use Tokio's work-stealing mode. `RuntimePool` creates independent runtimes per CPU core, binds connections to threads to implement the multi-reactor model, removes mutex contention, and maximizes CPU cache locality.
+- **Zero-copy data path**
+  - Wraps data using `Arc/Rc` pointers to eliminate copies along the forwarding path and achieve zero-copy.
+- **Batch I/O optimizations**
+  - **UDP**: On Linux, uses `sendmmsg` for syscall-level batch sending.
+  - **TCP**: Implements user-space write-queue coalescing (vectored I/O) and `writev`, greatly reducing syscall counts.
 
-## 性能基准
+## Performance Benchmarks
 
-我们在虚拟机环境（Loopback）下进行了极限压测：
+We conducted stress tests in a loopback environment:
 
-| 指标 | 测试结果 | 备注 |
-| :--- | :--- | :--- |
-| **并发连接数** | **20,000** | 稳定保持 |
-| **总吞吐量** | **~19.8 Gbps** | 接近网卡/总线极限 |
-| **CPU 使用率** | **~355%** | 约 3.5 个核心 |
-| **单核效能** | **~5.6 Gbps/Core** | 极高的能效比 |
-| **单连接内存** | **~19 KB** | 包含 TCP 栈与业务状态 |
+| Metric | Result |
+| :--- | :--- |
+| **Concurrent connections** | **20,000** |
+| **Total throughput** | **~19.8 Gbps** |
+| **CPU usage** | **~355%** |
+| **Per-core throughput** | **~5.6 Gbps/Core** |
+| **Memory per connection** | **~19 KB** |
 
-> **详细测试报告与图表请查阅 [BENCHMARK.md](docs/pull_bench.md)**
+> Detailed test report and charts: [BENCHMARK.md](docs/pull_bench.md)
 
-## 架构概览
-
-`dm-live` 采用 **去中心化** 的数据分发模型。数据源并非全局共享锁，而是由推流线程独占写入，并通过无锁消息队列将数据快照“投影”到各个拉流线程。
+## Architecture Overview
 
 ```text
-       [ Runtime-A (推流线程) ]                       [ Runtime-B (拉流线程) ]
+       [ Runtime-A (publish thread) ]                    [ Runtime-B (pull thread) ]
 +-----------------------------------+          +-----------------------------------+
 |           PushSession             |          |           PullSession             |
 +----------------+------------------+          +----------------+------------------+
-                 | 写入 (Write)                                 ^ 读取 (Read)
+                 | Write                                       ^ Read
                  v                                              |
 +----------------+------------------+          +----------------+------------------+
 |           MediaSource             |          |             Reader                |
@@ -49,26 +47,24 @@
                  |                             |      (Thread-Local Shard)         |
                  |                             +----------------+------------------+
                  |                                              ^
-                 | 跨线程通知 (MPSC Channel)                     |
+                 | Cross-thread notify (MPSC Channel)           |
                  +==============================================+
                  |  Payload: Arc<StorageSnapshot> (Zero-Copy)   |
                  +==============================================+
 ```
-### 数据流转
-*  接入与存储 (O(1))：Socket 数据解析为 Arc<RtpPacket> (零拷贝)，经 PacketSorter (UDP乱序重排) 与 PacketCache (组帧聚合) 后写入 GopRingBuffer，写入开销恒定。
-*  分发与传输 (O(N/M))：RingBuffer 将不可变快照 (Snapshot) 通过 Channel 广播至各 Runtime 的 Dispatcher，Dispatcher线性调用 Reader 从快照读取Pakcet再经由 SharedTcpWriter 批量发送。
+### Data Flow
+* **Ingest and store (O(1))**: Socket data is parsed into `Arc<RtpPacket>` (zero-copy), reordered by `PacketSorter` (UDP out-of-order), aggregated by `PacketCache`, and written into `GopRingBuffer` with constant overhead.
+* **Distribute and transmit (O(N/M))**: RingBuffer broadcasts immutable snapshots via Channel to each runtime's Dispatcher; the Dispatcher linearly schedules Readers to pull packets from the snapshot and `SharedTcpWriter` sends them in batches.
 
 
-## 现状
+## Current Status
 
-### 已支持
-*   使用协议 : RTSP 1.0 (TCP / UDP Unicast )。
-*   支持格式 : H.264, AAC 。
-*   特性 : 秒开（GOP 缓存）、低延迟转发。
+### Supported
+* Protocol: RTSP 1.0 (TCP / UDP Unicast).
+* Formats: H.264, AAC.
+* Features: instant startup (GOP cache), low-latency forwarding.
 
-### 未实现
-*   H.265 (HEVC)/PCM
-*   RTCP 支持
-*   支持转码
-
-
+### Not Implemented
+* H.265 (HEVC)/PCM
+* RTCP support
+* Transcoding support

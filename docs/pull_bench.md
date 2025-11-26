@@ -1,20 +1,20 @@
-# 拉流性能测试 (20k Concurrency @ 20Gbps)
+﻿# Pull Performance Test (20k Concurrency @ 20Gbps)
 
-## 总结
-虚拟机环境下处理20k并发拉流，带宽20Gbps，CPU使用率约 3.5 CPU cores，内存使用率约370MB RAM。
+## Summary
+In a VM environment handling 20k concurrent pull streams at 20 Gbps bandwidth, CPU usage is about 3.5 CPU cores and memory usage is about 370 MB RAM.
 
-## 环境
+## Environment
 
-*   **OS**: Ubuntu 25.04
-*   **CPU**: AMD Ryzen 9 7940HX with Radeon Graphics @ 2.4GHz, 16 vCores
-*   **Virtualization**: VMware Virtual Platform
-*   **RAM**: 16 GB
-*   **Network**: Loopback Interface 
-### 测试方法
-1. 使用 ffmpeg 推送928 kb/s H.264/AAC 流到本地 RTSP 服务器
-2. 使用 rtsp_client 测试，拉取上述 RTSP 流，模拟20k并发连接
+* **OS**: Ubuntu 25.04
+* **CPU**: AMD Ryzen 9 7940HX with Radeon Graphics @ 2.4GHz, 16 vCores
+* **Virtualization**: VMware Virtual Platform
+* **RAM**: 16 GB
+* **Network**: Loopback Interface
+### Test Method
+1. Use ffmpeg to push a 928 kb/s H.264/AAC stream to the local RTSP server.
+2. Use `rtsp_client` to pull that RTSP stream and simulate 20k concurrent connections.
 
-### 数据
+### Data
 | Metric            | Value               |
 |-------------------|---------------------|
 | Concurrency       | 20,000 connections  |
@@ -25,12 +25,12 @@
 |Memory per Connection| ~19 KB/Connection  |
 
 
-### 推流命令
+### Push Command
 ```bash
 ffmpeg -re -stream_loop -1 -i ./test.mp4 -c:v libx264 -c:a aac -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:9090/app/streamp
 ```
 
-### 两万拉流
+### 20k Pulls
 ```bash
 cargo run --example rtsp_client rtsp://127.0.0.1:9090/app/streamp tcp 20000
 ```
@@ -38,7 +38,7 @@ cargo run --example rtsp_client rtsp://127.0.0.1:9090/app/streamp tcp 20000
 
 <details>
 
-<summary>视频信息</summary>
+<summary>Video Info</summary>
 ```bash
 [mov,mp4,m4a,3gp,3g2,mj2 @ 0x58f465ef4e80] stream 0, timescale not set
 Input #0, mov,mp4,m4a,3gp,3g2,mj2, from './test.mp4':
@@ -72,7 +72,7 @@ Input #0, mov,mp4,m4a,3gp,3g2,mj2, from './test.mp4':
 ```
 </details>
 
-### 表现
+### Observations
 ##### TOP
 ![alt text](./image/image-1.png)
 
@@ -82,8 +82,8 @@ Input #0, mov,mp4,m4a,3gp,3g2,mj2, from './test.mp4':
 ##### perf top
 ![alt text](./image/image-3.png)
 
-##### 延迟与响应
-均在2万并发下测试
+##### Latency and Response
+All measurements were taken with 20k concurrent pulls.
 ```bash
 time ffprobe -v error -rtsp_transport tcp -select_streams v:0 -show_packets -count_packets 1 rtsp://127.0.0.1:9090/app/streamp
 
